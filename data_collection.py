@@ -18,23 +18,26 @@ import time
 client = GameClient()
 client.connect()
 
-def print_boost(message):
+def collect_player_data(message):
     data = json.loads(message.get("Data"))
+    player = data.get("Players", [])
+    player = player[0]
+    
+    if "Boost" in player:
+        with open("data.txt", "a", encoding="utf-8") as data:
+            data.write(f"{player["Boost"]}, ")
 
-    players = data.get("Players", [])
-    game = data.get("Game")
-    for i in range(len(players)):
-        if ("Boost" in players[i]) and ("TimeSeconds" in game):
-            print(f"[{game["TimeSeconds"]}] {players[i]["Name"]}: {players[i]["Boost"]}")
+    with open("data.txt", "a", encoding="utf-8") as data:
+        data.write("\n")
 
+
+#game = data.get("Game")
 
 def main():
     last_message = client.get_message()
 
     if last_message["Event"] == "UpdateState":
-        print_boost(last_message)
-
-
+        collect_player_data(last_message)
 
 
 if __name__ == "__main__":
