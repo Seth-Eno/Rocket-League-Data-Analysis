@@ -1,6 +1,7 @@
 from client import GameClient
 import json
 import time
+from pynput import keyboard
 
 # Sometimes the data arrives as a JSON string instead of a dictionary:
 #
@@ -17,15 +18,57 @@ import time
 
 client = GameClient()
 client.connect()
+message = client.get_message()
+def get_name(message):
+    data = json.loads(message.get("Data"))
+    player = data.get("Players", [])
+    player = player[0]
+    return player["Name"]
+while message["Event"] != "UpdateState":
+    time.sleep(0.1)
+    message = client.get_message()
+with open("player_name.txt", "w") as file:
+    file.write(get_name(message))
+with open("last_ball_data.txt", "w") as file:
+    file.write(f"0, 0, 0, 0, 0")
+with open("last_player_data.txt", "w") as file:
+    file.write(f"0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0")
 
-def collect_player_data(message, last_ball_hit):
+
+def collect_data():
+    with open("last_player_data.txt", "r") as file:
+        data = file.read()
+        data = data.split(",")
+    row = data
+    with open("last_ball_data.txt", "r") as file:
+        data = file.read()
+        data = data.split(",")
+    row += data
+    with open("data.txt", "a") as file:
+        for each in row:
+            file.write(f"{each}, ")
+        file.write(f"\n")     
+
+def get_ball_data(message):
+    data = json.loads(message.get("Data"))
+    ball = data["Ball"]
+    location = ball["Location"]
+    datums = []
+    player = data["Players"][0]
+    with open("player_name.txt", "r") as file:
+        player_of_interest = file.read()
+    datums = [int(player["Name"] == player_of_interest), ball["PreHitSpeed"], ball["PostHitSpeed"], location["X"], location["Y"], location["Z"]]
+    with open("last_ball_data.txt", "w") as file:
+        for each in datums:
+            file.write(f"{each},")
+
+def get_player_data(message):
     data = json.loads(message.get("Data"))
     player = data.get("Players", [])
     player = player[0]
     game = data.get("Game")
     ball = game["Ball"]
     datums = []
-    
     if "Touches" in player:
         datums.append(player["Touches"])
     else:
@@ -59,7 +102,7 @@ def collect_player_data(message, last_ball_hit):
     else:
         datums.append(int(False))
     if "Speed" in ball:
-        datums.append(ball["Speed"])
+        datums.append(round(ball["Speed"], 2))
     else:
         datums.append(int(False))
     if "TeamNum" in ball:
@@ -67,31 +110,19 @@ def collect_player_data(message, last_ball_hit):
     else:
         datums.append(int(False))
 
-
-
-    with open("data.txt", "a") as data:
-        for datum in datums:
-            data.write(f"{datum}, ")
-        data.write(f"\n")
-
-
-
+    with open("last_player_data.txt", "w") as file:
+        for each in datums:
+            file.write(f"{each},")
 
 def main():
     last_message = client.get_message()
-    last_ball_hit = [[], 0, 0, 0, 0, 0]
-
-    if last_message["Event"] == "UpdateState":
-        collect_player_data(last_message, last_ball_hit)
 
     if last_message["Event"] == "BallHit":
-        data = json.loads(last_message.get("Data"))
-        ball = data["Ball"]
-        location = ball["Location"]
-        players = []
-        for i in range(len(data["Players"])):
-            players.append(data["Players"][i]["Name"])
-        last_ball_hit = [players, ball["PreHitSpeed"], ball["PostHitSpeed"], location["X"], location["Y"], location["Z"]]
+        get_ball_data(last_message)
+    if last_message["Event"] == "UpdateState":
+        get_player_data(last_message)
+
+    #collect_data()
 
 
 if __name__ == "__main__":
