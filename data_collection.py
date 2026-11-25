@@ -2,6 +2,9 @@ from client import GameClient
 import json
 import time
 from pynput import keyboard
+from pynput.keyboard import KeyCode
+
+# keep the program running until Esc
 
 # Sometimes the data arrives as a JSON string instead of a dictionary:
 #
@@ -19,6 +22,7 @@ from pynput import keyboard
 client = GameClient()
 client.connect()
 message = client.get_message()
+
 def get_name(message):
     data = json.loads(message.get("Data"))
     player = data.get("Players", [])
@@ -29,25 +33,27 @@ while message["Event"] != "UpdateState":
     message = client.get_message()
 with open("player_name.txt", "w") as file:
     file.write(get_name(message))
-with open("last_ball_data.txt", "w") as file:
-    file.write(f"0, 0, 0, 0, 0")
-with open("last_player_data.txt", "w") as file:
-    file.write(f"0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0")
 
+with open("last_ball_data.txt", "w") as file:
+    file.write(f"0,0,0,0,0,")
+with open("last_player_data.txt", "w") as file:
+    file.write(f"0,0,0,0,0,0,0,0,0,0,0,")
 
 def collect_data():
     with open("last_player_data.txt", "r") as file:
         data = file.read()
+        data = data[:-1]
         data = data.split(",")
     row = data
     with open("last_ball_data.txt", "r") as file:
         data = file.read()
+        data = data[:-1]
         data = data.split(",")
     row += data
     with open("data.txt", "a") as file:
         for each in row:
-            file.write(f"{each}, ")
-        file.write(f"\n")     
+            file.write(f"{each},")
+        file.write(f"\n")
 
 def get_ball_data(message):
     data = json.loads(message.get("Data"))
@@ -57,7 +63,7 @@ def get_ball_data(message):
     player = data["Players"][0]
     with open("player_name.txt", "r") as file:
         player_of_interest = file.read()
-    datums = [int(player["Name"] == player_of_interest), ball["PreHitSpeed"], ball["PostHitSpeed"], location["X"], location["Y"], location["Z"]]
+    datums = [int(player["Name"] == player_of_interest), round(ball["PreHitSpeed"], 2), round(ball["PostHitSpeed"], 2), round(location["X"], 2), round(location["Y"], 2), round(location["Z"], 2)]
     with open("last_ball_data.txt", "w") as file:
         for each in datums:
             file.write(f"{each},")
@@ -114,6 +120,21 @@ def get_player_data(message):
         for each in datums:
             file.write(f"{each},")
 
+
+def on_press(key):
+    if key == KeyCode.from_char("p"):
+        collect_data()
+        with open("labels.txt", "a") as file:
+            file.write(f"{str(1)}\n")
+    if key == KeyCode.from_char("o"):
+        collect_data()
+        with open("labels.txt", "a") as file:
+            file.write(f"{str(0)}\n")
+
+listener = keyboard.Listener(on_press=on_press)
+listener.start()
+
+
 def main():
     last_message = client.get_message()
 
@@ -121,8 +142,6 @@ def main():
         get_ball_data(last_message)
     if last_message["Event"] == "UpdateState":
         get_player_data(last_message)
-
-    #collect_data()
 
 
 if __name__ == "__main__":
